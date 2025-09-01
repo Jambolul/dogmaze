@@ -9,15 +9,20 @@ public class Game : MonoBehaviour
     public CinemachineVirtualCamera vcam;
     public Transform Player;
     public Transform Goal;
-    public Transform Walls;            
-    public GameObject WallTemplate;    
-    public GameObject FloorTemplate;  
+    public Transform Walls;
+    public GameObject WallTemplate;
+    public GameObject FloorTemplate;
+
+    [Header("UI")]
+    [SerializeField] private GameObject winPanel;
+    [SerializeField] private GameObject losePanel;
 
     [Header("Audio")]
-    public AudioSource ambience;       
-    public AudioSource sfx;            
+    public AudioSource ambience;
+    public AudioSource sfx;
     public AudioClip ambienceClip;
     public AudioClip goalClip;
+    [SerializeField] private AudioClip loseClip;
 
     [Header("Tuning")]
     [Min(2)] public int Width = 6;
@@ -26,14 +31,12 @@ public class Game : MonoBehaviour
 
     [Tooltip("Only used if you enable keyboard debug movement.")]
     [Min(0)] public float MovementSmoothing = 12f;
-    public bool EnableKeyboardMovement = false;   
+    public bool EnableKeyboardMovement = false;
 
-    
     bool[,] HWalls, VWalls;
     int goalX, goalY;
     int playerX, playerY;
 
-    
     bool transitioning = false;
     Collider2D playerCol;
     Rigidbody2D playerRb;
@@ -53,6 +56,10 @@ public class Game : MonoBehaviour
     void Start()
     {
         if (!ValidateSetup()) { enabled = false; return; }
+
+        Time.timeScale = 1f;                                   
+        if (winPanel) winPanel.SetActive(false);               
+        if (losePanel) losePanel.SetActive(false);             
 
         if (ambience && ambienceClip)
         {
@@ -108,19 +115,16 @@ public class Game : MonoBehaviour
             goalY = Random.Range(0, Height);
         } while (Vector2.Distance(new Vector2(playerX, playerY), new Vector2(goalX, goalY)) < minDist);
 
-        
         for (int x = 0; x < Width; x++)
             for (int y = 0; y < Height; y++)
                 Instantiate(FloorTemplate, new Vector3(x + 0.5f, y + 0.5f, 0f),
                             Quaternion.identity, Walls);
-
 
         for (int x = 0; x < Width + 1; x++)
             for (int y = 0; y < Height; y++)
                 if (HWalls[x, y])
                     Instantiate(WallTemplate, new Vector3(x, y + 0.5f, 0f),
                                 Quaternion.identity, Walls);
-
 
         for (int x = 0; x < Width; x++)
             for (int y = 0; y < Height + 1; y++)
@@ -138,31 +142,37 @@ public class Game : MonoBehaviour
     {
         if (transitioning) return;
         transitioning = true;
-        var current = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(current.buildIndex);
+
+        SetPlayerActive(false);
+        if (sfx && loseClip) sfx.PlayOneShot(loseClip);
+
+        if (losePanel) losePanel.SetActive(true);
+        Time.timeScale = 0f; 
     }
 
     public void LevelComplete()
     {
         if (transitioning) return;
         transitioning = true;
-        StartCoroutine(LevelCompleteCo());
+
+        SetPlayerActive(false);
+        if (sfx && goalClip) sfx.PlayOneShot(goalClip);
+
+        if (winPanel) winPanel.SetActive(true);
+        Time.timeScale = 0f; 
     }
 
-    System.Collections.IEnumerator LevelCompleteCo()
+    public void Retry()
     {
-        SetPlayerActive(false);
+        Time.timeScale = 1f;
+        Scene current = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(current.buildIndex);
+    }
 
-        if (sfx && goalClip) sfx.PlayOneShot(goalClip);
-        float delay = Mathf.Clamp(goalClip.length, 0.25f, 2f);
-
-        yield return new WaitForSeconds(delay);
-
-        if (Random.Range(0, 2) == 0) Width++; else Height++;
-        StartNext();
-
-        SetPlayerActive(true);
-        transitioning = false;
+    public void MainMenuButton()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
     }
 
     void SetPlayerActive(bool on)
